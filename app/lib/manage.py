@@ -54,23 +54,23 @@ def replace_vars(file_content: str):
   return re.sub(r'<(.*?)>', lambda m: get_var(convert_to_upper(m.group(1))), file_content)
 
 def update():
-    os.system("docker run --rm -v {}:/citadel -u 1000:1000 {} /app-cli convert /citadel".format(nodeRoot, dependencies['app-cli']))
+    os.system("docker run --rm -v {}:/citadel -u 1000:1000 --add-host=host.docker.internal:host-gateway {} /app-cli convert /citadel --caddy-url http://host.docker.internal:2019/".format(nodeRoot, dependencies['app-cli']))
     print("Generated configuration successfully")
 
 def downloadNew():
-    os.system("docker run --rm -v {}:/citadel -u 1000:1000 {} /app-cli download-nwq /citadel".format(nodeRoot, dependencies['app-cli']))
+    os.system("docker run --rm -v {}:/citadel -u 1000:1000 --add-host=host.docker.internal:host-gateway {} /app-cli download-new /citadel".format(nodeRoot, dependencies['app-cli']))
     print("Generated configuration successfully")
 
 def downloadAll():
-    os.system("docker run --rm -v {}:/citadel -u 1000:1000 {} /app-cli download-apps /citadel".format(nodeRoot, dependencies['app-cli']))
+    os.system("docker run --rm -v {}:/citadel -u 1000:1000 --add-host=host.docker.internal:host-gateway {} /app-cli download-apps /citadel".format(nodeRoot, dependencies['app-cli']))
     print("Generated configuration successfully")
 
 def download(app_id):
-    os.system("docker run --rm -v {}:/citadel -u 1000:1000 {} /app-cli download {} --citadel-root /citadel".format(nodeRoot, dependencies['app-cli'], app_id))
+    os.system("docker run --rm -v {}:/citadel -u 1000:1000 --add-host=host.docker.internal:host-gateway {} /app-cli download {} --citadel-root /citadel".format(nodeRoot, dependencies['app-cli'], app_id))
     print("Generated configuration successfully")
 
 def getAvailableUpdates():
-    os.system("docker run --rm -v {}:/citadel -u 1000:1000 {} /app-cli check-updates /citadel".format(nodeRoot, dependencies['app-cli']))
+    os.system("docker run --rm -v {}:/citadel -u 1000:1000 --add-host=host.docker.internal:host-gateway {} /app-cli check-updates /citadel".format(nodeRoot, dependencies['app-cli']))
     print("Generated configuration successfully")
 
 def getUserData():
@@ -112,6 +112,7 @@ def compose(app, arguments):
             os.environ["APP_SEED_{}".format(i)] = deriveEntropy("app-{}-seed{}".format(app, i))
     except: pass
     os.environ["APP_DATA_DIR"] = os.path.join(appDataDir, app)
+    os.environ["CITADEL_APP_DATA"] = appDataDir
     # Chown and chmod dataDir to have the owner 1000:1000 and the same permissions as appDir
     subprocess.call("chown -R 1000:1000 {}".format(os.path.join(appDataDir, app)), shell=True)
     try:
@@ -123,7 +124,7 @@ def compose(app, arguments):
         subprocess.call("chmod -R 770 {}".format(os.path.join(appDataDir, app, "data", "nextcloud")), shell=True)
     os.environ["BITCOIN_DATA_DIR"] = os.path.join(nodeRoot, "bitcoin")
     # List all hidden services for an app and put their hostname in the environment
-    hiddenServices: List[str] = getAppHiddenServices(app)
+    hiddenServices: List[str] = getAppRegistryEntry(app).get("hiddenServices", [])
     for service in hiddenServices:
         appHiddenServiceFile = os.path.join(
             nodeRoot, "tor", "data", "app-{}-{}/hostname".format(app, service))
@@ -181,13 +182,13 @@ def setRemoved(app: str):
     with open(userFile, "w") as f:
         json.dump(userData, f)
 
-
-def getAppHiddenServices(app: str):
-    torDir = os.path.join(nodeRoot, "tor", "data")
-    # List all subdirectories of torDir which start with app-${APP}-
-    # but return them without the app-${APP}- prefix
-    results = []
-    for subdir in os.listdir(torDir):
-        if subdir.startswith("app-{}-".format(app)):
-            results.append(subdir[len("app-{}-".format(app)):])
-    return results
+# Gets the app's registry entry from the registry.json file
+# The file is an array of objects, each object is an app's registry entry
+# We can filter by the "id" property to get the app's registry entry
+def getAppRegistryEntry(app: str):
+    with open(os.path.join(appsDir, "registry.json")) as f:
+        registry = json.load(f)
+    for appRegistryEntry in registry:
+        if appRegistryEntry["id"] == app:
+            return appRegistryEntry
+    return None
