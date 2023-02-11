@@ -2,13 +2,14 @@
 
 # SPDX-FileCopyrightText: 2020 Umbrel. https://getumbrel.com
 # SPDX-FileCopyrightText: 2021-2022 Citadel and contributors
+# SPDX-FileCopyrightText: 2023 Nirvati and contributors
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 set -euo pipefail
 
 RELEASE=$1
-CITADEL_ROOT=$2
+NIRVATI_ROOT=$2
 
 echo
 echo "======================================="

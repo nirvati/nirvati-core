@@ -2,15 +2,16 @@
 
 # SPDX-FileCopyrightText: 2020 Umbrel https://getumbrel.com
 # SPDX-FileCopyrightText: 2021-2022 Citadel and contributors
+# SPDX-FileCopyrightText: 2023 Nirvati and contributors
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 set -euo pipefail
 
-# Start Citadel
+# Start Nirvati
 
 if [[ $UID != 0 ]]; then
-    echo "Citadel must be started as root"
+    echo "Nirvati must be started as root"
     echo "Please re-run this script as"
     echo "  sudo ./scripts/start"
     exit 1
@@ -19,7 +20,7 @@ fi
 check_dependencies () {
   for cmd in "$@"; do
     if ! command -v $cmd >/dev/null 2>&1; then
-      echo "This script requires \"${cmd}\" to be installed"
+      echo "Nirvati requires \"${cmd}\" to be installed."
       exit 1
     fi
   done
@@ -31,76 +32,62 @@ check_dependencies readlink dirname ip docker
 # Check OTA update scripts' dependencies
 check_dependencies rsync jq curl
 
-CITADEL_ROOT="$(dirname $(readlink -f "${BASH_SOURCE[0]}"))/.."
-CITADEL_LOGS="${CITADEL_ROOT}/logs"
+NIRVATI_ROOT="$(dirname $(readlink -f "${BASH_SOURCE[0]}"))/.."
+NIRVATI_LOGS="${NIRVATI_ROOT}/logs"
 
-if [[ ! -d "$CITADEL_ROOT" ]]; then
-  echo "Root dir does not exist '$CITADEL_ROOT'"
-  exit 1
-fi
-
-# Configure Citadel if it isn't already configured
-if [[ ! -f "${CITADEL_ROOT}/statuses/configured" ]]; then
-  CADDY_PORT=${CADDY_PORT:-80} CADDY_HTTPS_PORT=${CADDY_HTTPS_PORT:-443} NETWORK="${NETWORK:-mainnet}" "${CITADEL_ROOT}/scripts/configure"
+# Configure Nirvati if it isn't already configured
+if [[ ! -f "${NIRVATI_ROOT}/statuses/configured" ]]; then
+  CADDY_PORT=${CADDY_PORT:-80} CADDY_HTTPS_PORT=${CADDY_HTTPS_PORT:-443} "${NIRVATI_ROOT}/scripts/configure"
 fi
 
 echo
 echo "======================================"
 echo "============= STARTING ==============="
-echo "============= CITADEL ================"
+echo "============= NIRVATI ================"
 echo "======================================"
 echo
 
 echo "Setting environment variables..."
 echo
 
-# Check Citadel OS
-[[ -f "/etc/default/citadel" ]] && source "/etc/default/citadel"
-if [[ -z "${CITADEL_OS:-}" ]]; then
-  export IS_CITADEL_OS="false"
+# Check Nirvati OS
+[[ -f "/etc/default/nirvati" ]] && source "/etc/default/nirvati"
+if [[ -z "${NIRVATI_OS:-}" ]]; then
+  export IS_NIRVATI_OS="false"
 else
-  export IS_CITADEL_OS="true"
+  export IS_NIRVATI_OS="true"
 fi
 
-# Whitelist device IP, hostname and hidden service for CORS
+# Whitelist device IP and hostname for CORS
 DEVICE_IP=$(hostname -I | awk '{print $1}') || DEVICE_IP="$(ip addr show $(ip route | awk '/default/ { print $5 }') | grep "inet" | head -n 1 | awk '/inet/ {print $2}' | cut -d'/' -f1)"
 DEVICE_HOSTNAME="$(hostname)" || DEVICE_HOSTNAME="$(cat /etc/hostname)"
 DEVICE_HOSTS="http://${DEVICE_IP},http://${DEVICE_HOSTNAME}.local,https://${DEVICE_HOSTNAME}.local,http://${DEVICE_HOSTNAME},https://${DEVICE_HOSTNAME}"
-if [[ -f "${CITADEL_ROOT}/tor/data/web/hostname" ]]; then
-    hidden_service_url=$(cat "${CITADEL_ROOT}/tor/data/web/hostname")
-    DEVICE_HOSTS="${DEVICE_HOSTS},http://${hidden_service_url}"
-fi
 export DEVICE_HOSTS=$DEVICE_HOSTS
 export DEVICE_HOSTNAME="${DEVICE_HOSTNAME}.local"
 export DEVICE_IP=$DEVICE_IP
 
-# Increase default Docker and Compose timeouts to 240s
-# as bitcoin can take a long while to respond
-export DOCKER_CLIENT_TIMEOUT=240
-export COMPOSE_HTTP_TIMEOUT=240
-
-cd "$CITADEL_ROOT"
+cd "$NIRVATI_ROOT"
 
 echo "Starting karen..."
 echo
-./karen &>> "${CITADEL_LOGS}/karen.log" &
+./karen &>> "${NIRVATI_LOGS}/karen.log" &
 
 echo "Starting status monitors..."
 echo
 pkill -f ./scripts/status-monitor || true
-./scripts/status-monitor memory 300 &>> "${CITADEL_LOGS}/status-monitor.log" &
-./scripts/status-monitor storage 60 &>> "${CITADEL_LOGS}/status-monitor.log" &
-./scripts/status-monitor temperature 15 &>> "${CITADEL_LOGS}/status-monitor.log" &
-./scripts/status-monitor uptime 15 &>> "${CITADEL_LOGS}/status-monitor.log" &
-./scripts/status-monitor app-updates 1800 &>> "${CITADEL_LOGS}/status-monitor.log" &
+./scripts/status-monitor memory 300 &>> "${NIRVATI_LOGS}/status-monitor.log" &
+./scripts/status-monitor storage 60 &>> "${NIRVATI_LOGS}/status-monitor.log" &
+./scripts/status-monitor temperature 15 &>> "${NIRVATI_LOGS}/status-monitor.log" &
+./scripts/status-monitor uptime 15 &>> "${NIRVATI_LOGS}/status-monitor.log" &
+./scripts/status-monitor app-updates 1800 &>> "${NIRVATI_LOGS}/status-monitor.log" &
 
 echo "Starting backup monitor..."
 echo
-./scripts/backup/monitor &>> "${CITADEL_LOGS}/backup-monitor.log" &
+./scripts/backup/monitor &>> "${NIRVATI_LOGS}/backup-monitor.log" &
 
 echo "Starting decoy backup trigger..."
 echo
-./scripts/backup/decoy-trigger &>> "${CITADEL_LOGS}/backup-decoy-trigger.log" &
+./scripts/backup/decoy-trigger &>> "${NIRVATI_LOGS}/backup-decoy-trigger.log" &
 
 echo "Resetting config files"
 echo
@@ -109,18 +96,17 @@ echo
 echo
 echo "Starting Docker services..."
 echo
-export APP_ELECTRUM_IP=$(./scripts/app get-ip electrum || echo)
 docker compose up --detach --build --remove-orphans || {
   echo "Failed to start containers"
   exit 1
 }
 echo
 
-# Unlock the user file on each start of Citadel to avoid issues
+# Unlock the user file on each start of Nirvati to avoid issues
 # Normally, the user file shouldn't ever be locked, if it is, something went wrong, but it could still be working
-if [[ -f "${CITADEL_ROOT}/db/user.json.lock" ]]; then
-  echo "WARNING: The user file was locked, Citadel probably wasn't shut down properly"
-  rm "${CITADEL_ROOT}/db/user.json.lock"
+if [[ -f "${NIRVATI_ROOT}/db/user.json.lock" ]]; then
+  echo "WARNING: The user file was locked, Nirvati probably wasn't shut down properly"
+  rm "${NIRVATI_ROOT}/db/user.json.lock"
 fi
 
 echo
@@ -129,9 +115,6 @@ echo
 ./scripts/app start installed
 echo
 
-echo "Citadel is now accessible at"
+echo "Nirvati is now accessible at"
 echo "  http://${DEVICE_HOSTNAME}"
 echo "  http://${DEVICE_IP}"
-if [[ ! -z "${hidden_service_url:-}" ]]; then
-    echo "  http://${hidden_service_url}"
-fi

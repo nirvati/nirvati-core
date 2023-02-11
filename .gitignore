@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: 2020 Umbrel
 # SPDX-FileCopyrightText: 2021-2022 Citadel and contributors
+# SPDX-FileCopyrightText: 2023 Nirvati and contributors
 # 
 # SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -14,15 +15,12 @@
 *.env
 .backup
 *.pyc
-bitcoin/*
-tor/*
-db/*
+postgres/*
+db/user.json
 statuses/*
 app-data
 apps
 caddy/*
-i2p/*
-docker-compose.override.yml
 
 # Commit these empty directories
 !**/.gitkeep
@@ -30,15 +28,12 @@ docker-compose.override.yml
 !apps/.gitkeep
 !db/.gitkeep
 !db/citadel-seed
-db/citadel-seed/*
-!db/citadel-seed/.gitkeep
+db/nirvati-seed/*
+!db/nirvati-seed/.gitkeep
 !logs/.gitkeep
-!tor/data/.gitkeep
-!tor/run/.gitkeep
-!tor/.gitkeep
+!postgres/.gitkeep
 !db/.gitkeep
 !caddy/data/.gitkeep
-!i2p/.gitkeep
 
 !**/*.License
 

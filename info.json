@@ -1,7 +1,7 @@
 {
-    "version": "0.2.0-beta.0",
-    "name": "Citadel 0.2.0-beta.0",
-    "requires": ">=0.1.0",
+    "version": "0.0.1",
+    "name": "Nirvati 0.0.1",
+    "requires": ">=0.0.0",
     "isQuickUpdate": false,
-    "notes": "This update fixes the LND issues, the LNDg app, updates BTCPay, adds a few more app icons, and allows I2P managment (beta)."
+    "notes": "Welcome to Nirvati."
 }

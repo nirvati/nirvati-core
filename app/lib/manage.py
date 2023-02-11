@@ -102,9 +102,7 @@ def compose(app, arguments):
     composeFile = os.path.join(appsDir, app, "docker-compose.yml")
     commonComposeFile = os.path.join(appSystemDir, "docker-compose.common.yml")
     os.environ["APP_DOMAIN"] = subprocess.check_output(
-        "hostname -s 2>/dev/null || echo 'citadel'", shell=True).decode("utf-8").strip() + ".local"
-    os.environ["APP_HIDDEN_SERVICE"] = subprocess.check_output("cat {} 2>/dev/null || echo 'notyetset.onion'".format(
-        os.path.join(nodeRoot, "tor", "data", "app-{}/hostname".format(app))), shell=True).decode("utf-8").strip()
+        "hostname -s 2>/dev/null || echo 'nirvati'", shell=True).decode("utf-8").strip() + ".local"
     try:
         os.environ["APP_SEED"] = deriveEntropy("app-{}-seed".format(app))
         # Allow more app seeds, with random numbers from 1-5 assigned in a loop
@@ -119,17 +117,11 @@ def compose(app, arguments):
         os.chmod(os.path.join(appDataDir, app), os.stat(os.path.join(appsDir, app)).st_mode)
     except Exception:
         pass
+
+
     if app == "nextcloud":
         subprocess.call("chown -R 33:33 {}".format(os.path.join(appDataDir, app, "data", "nextcloud")), shell=True)
         subprocess.call("chmod -R 770 {}".format(os.path.join(appDataDir, app, "data", "nextcloud")), shell=True)
-    os.environ["BITCOIN_DATA_DIR"] = os.path.join(nodeRoot, "bitcoin")
-    # List all hidden services for an app and put their hostname in the environment
-    hiddenServices: List[str] = getAppRegistryEntry(app).get("hiddenServices", [])
-    for service in hiddenServices:
-        appHiddenServiceFile = os.path.join(
-            nodeRoot, "tor", "data", "app-{}-{}/hostname".format(app, service))
-        os.environ["APP_HIDDEN_SERVICE_{}".format(service.upper().replace("-", "_"))] = subprocess.check_output("cat {} 2>/dev/null || echo 'notyetset.onion'".format(
-            appHiddenServiceFile), shell=True).decode("utf-8").strip()
 
     if not os.path.isfile(composeFile):
         print("Error: Could not find docker-compose.yml in " + app)

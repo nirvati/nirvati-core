@@ -15,7 +15,6 @@ from os import urandom
 from time import sleep
 
 import yaml
-from lib.rpcauth import get_data
 
 
 def generate_password(size):
@@ -81,27 +80,19 @@ if not shutil.which("docker"):
     exit(1)
 
 # Switch to node root directory.
-CITADEL_ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-os.chdir(CITADEL_ROOT)
+NIRVATI_ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(NIRVATI_ROOT)
 
 with open("./db/dependencies.yml", "r") as file: 
   dependencies = yaml.safe_load(file)
 
-# Configure for appropriate network depending
-# upon the user-supplied value of $NETWORK
-# If the network is not specified, then use the mainnet
-BITCOIN_NETWORK=os.environ.get('NETWORK') or 'mainnet'
 DEVICE_IP=os.environ.get("DEVICE_IP")
 
-# Check if network neither mainnet nor testnet nor regtest
-if BITCOIN_NETWORK not in ['mainnet', 'testnet', 'signet', 'regtest']:
-    print('Error: Network must be either mainnet, testnet, signet or regtest!')
-    exit(1)
 
-with open(os.path.join(CITADEL_ROOT, "info.json"), 'r') as file:
+with open(os.path.join(NIRVATI_ROOT, "info.json"), 'r') as file:
   CITADEL_VERSION=json.load(file)['version']
 
-status_dir = os.path.join(CITADEL_ROOT, 'statuses')
+status_dir = os.path.join(NIRVATI_ROOT, 'statuses')
 
 print("\n======================================")
 if os.path.isfile(status_dir+'/configured'):
@@ -113,9 +104,6 @@ else:
 
 print("============== CITADEL  ==============")
 print("======================================\n")
-
-print("Installing additional services")
-data = subprocess.run("\"{}\" setup".format(os.path.join(CITADEL_ROOT, "services", "manage.py")), shell=True)
 
 # Parse a dotenv file
 # Values can either be KEY=VALUE or KEY="VALUE" or KEY='VALUE'
@@ -145,22 +133,10 @@ CADDY_PORT=os.environ.get('CADDY_PORT') or "80"
 CADDY_HTTPS_PORT=os.environ.get('CADDY_PORT') or "443"
 UPDATE_CHANNEL="stable"
 
+dotenv = False
+
 if reconfiguring:
   dotenv=parse_dotenv('./.env')
-
-  BITCOIN_NETWORK=os.environ.get('OVERWRITE_NETWORK') or dotenv['BITCOIN_NETWORK']
-  # Check if network neither mainnet nor testnet nor regtest
-  if BITCOIN_NETWORK not in ['mainnet', 'testnet', 'signet', 'regtest']:
-      print('Error: Network must be either mainnet, testnet, signet or regtest!')
-      exit(1)
-  print("Using {} network\n".format(BITCOIN_NETWORK))
-  BITCOIN_RPC_PORT=dotenv['BITCOIN_RPC_PORT']
-  BITCOIN_P2P_PORT=dotenv['BITCOIN_P2P_PORT']
-  BITCOIN_RPC_USER=dotenv['BITCOIN_RPC_USER']
-  BITCOIN_RPC_PASS=dotenv['BITCOIN_RPC_PASS']
-  BITCOIN_RPC_AUTH=dotenv['BITCOIN_RPC_AUTH']
-  if 'NGINX_PORT' in dotenv:
-    CADDY_PORT=dotenv['NGINX_PORT']
   if 'CADDY_PORT' in dotenv:
     CADDY_PORT=dotenv['CADDY_PORT']
   CADDY_HTTPS_PORT="443"
@@ -170,68 +146,18 @@ if reconfiguring:
     CADDY_HTTPS_PORT="443"
   if 'UPDATE_CHANNEL' in dotenv and dotenv['UPDATE_CHANNEL'] != "main" and dotenv['UPDATE_CHANNEL'] != "migration":
     UPDATE_CHANNEL=dotenv['UPDATE_CHANNEL']
-  if 'I2P_PASSWORD' in dotenv:
-    I2P_PASSWORD=dotenv['I2P_PASSWORD']
-  else:
-    I2P_PASSWORD=generate_password(64)
+
+if dotenv and 'POSTGRES_PASSWORD' in dotenv:
+  POSTGRES_PASSWORD=dotenv['POSTGRES_PASSWORD']
 else:
-  # Generate RPC credentials
-  print("Generating auth credentials\n")
-  BITCOIN_RPC_USER="citadel"
-  BITCOIN_RPC_DETAILS=get_data(BITCOIN_RPC_USER)
-  BITCOIN_RPC_AUTH=BITCOIN_RPC_DETAILS['auth']
-  BITCOIN_RPC_PASS=BITCOIN_RPC_DETAILS['password']
-  I2P_PASSWORD=generate_password(64)
-
-EXTERNAL_IP = ""
-if os.path.isfile('./tor/data/bitcoin-p2p/hostname'):
-  EXTERNAL_IP="externalip=" + open('./tor/data/bitcoin-p2p/hostname').read()
-
-if BITCOIN_NETWORK == "mainnet":
-  BITCOIN_RPC_PORT=8332
-  BITCOIN_P2P_PORT=8333
-elif BITCOIN_NETWORK == "testnet":
-  BITCOIN_RPC_PORT=18332
-  BITCOIN_P2P_PORT=18333
-elif BITCOIN_NETWORK == "signet":
-  BITCOIN_RPC_PORT=38332
-  BITCOIN_P2P_PORT=38333
-  BITCOIN_NODE="bitcoind"
-elif BITCOIN_NETWORK == "regtest":
-  BITCOIN_RPC_PORT=18334
-  BITCOIN_P2P_PORT=18335
-  BITCOIN_NODE="bitcoind"
-else:
-  exit(1)
-
-NETWORK_SECTION=""
-if BITCOIN_NETWORK != "mainnet":
-  NETWORK_SECTION = "[{}]".format(BITCOIN_NETWORK)
-if BITCOIN_NETWORK == "testnet":
-  NETWORK_SECTION = "[test]"
+  POSTGRES_PASSWORD=generate_password(64)
 
 # IP addresses for services
 NETWORK_IP="10.21.21.0"
 GATEWAY_IP="10.21.21.1"
 DASHBOARD_IP="10.21.21.3"
-MANAGER_IP="10.21.21.4"
-BITCOIN_IP="10.21.21.5"
-TOR_PROXY_IP="10.21.21.6"
-APPS_TOR_IP="10.21.21.7"
-APPS_2_TOR_IP="10.21.21.8"
-APPS_3_TOR_IP="10.21.21.9"
-I2P_IP="10.21.21.10"
-
-# Ports
-BITCOIN_RPC_PORT="8332"
-BITCOIN_P2P_PORT="8333"
-BITCOIN_ZMQ_RAWBLOCK_PORT="28332"
-BITCOIN_ZMQ_RAWTX_PORT="28333"
-BITCOIN_ZMQ_HASHBLOCK_PORT="28334"
-BITCOIN_ZMQ_SEQUENCE_PORT="28335"
-TOR_PROXY_PORT="9050"
-I2P_SAM_PORT="7656"
-TOR_CONTROL_PORT="29051"
+API_IP="10.21.21.4"
+POSTGRES_IP="10.21.21.5"
 
 DEVICE_HOSTNAME=""
 try:
@@ -286,11 +212,6 @@ def build_template(template_path, output_path):
       file.write(data)
 
 print("Generating configuration files...")
-build_template("./templates/torrc-core-sample", "./tor/torrc-core")
-build_template("./templates/bitcoin-sample.conf", "./bitcoin/bitcoin.conf")
-build_template("./templates/i2p-sample.conf", "./i2p/i2pd.conf")
-build_template("./templates/i2p-tunnels-sample.conf", "./i2p/tunnels.conf")
-MIDDLEWARE_IP="NOT_YET_SET"
 build_template("./templates/.env-sample", "./.env")
 
 print("Ensuring Docker Compose is up to date...")
@@ -300,16 +221,22 @@ print("Updating core services...")
 print()
 with open("docker-compose.yml", 'r') as stream:
   compose = yaml.safe_load(stream)
-for service in ["manager", "dashboard"]:
+for service in ["api", "dashboard", "postgres"]:
   compose["services"][service]["image"] = dependencies[service]
-for service in ["tor", "app-tor", "app-2-tor", "app-3-tor"]:
-  compose["services"][service]["image"] = dependencies["tor"]
 with open("docker-compose.yml", "w") as stream:
     yaml.dump(compose, stream, sort_keys=False)
 
+# If NIRVATI_ROOT/db/nirvati-seed/seed does not exist, write the seed file with a random password
+seed_file = os.path.join(NIRVATI_ROOT, 'db', 'nirvati-seed', 'seed')
+if not os.path.exists(seed_file):
+  print("Generating seed file...")
+  os.makedirs(os.path.join(NIRVATI_ROOT, 'db', 'nirvati-seed'), exist_ok=True)
+  with open(seed_file, 'w') as file:
+    file.write(generate_password(64))
+
 print("Configuring permissions...\n")
 try:
-  os.system('chown -R 1000:1000 {}'.format(CITADEL_ROOT))
+  os.system('chown -R 1000:1000 {}'.format(NIRVATI_ROOT))
 except: pass
 
 if not reconfiguring:
@@ -319,31 +246,13 @@ else:
   print("Generating app configuration...\n")
   os.system('./scripts/app generate')
 
-# Run ./scripts/app get-implementation lightning to get the implementation
-# If it fails, install the LND app and set the implementation to LND
-try:
-  implementation = subprocess.check_output("./scripts/app get-implementation lightning", shell=True).decode("utf-8").strip()
-except:
-  print("Installing LND...\n")
-  os.system('./scripts/app install lnd')
-  implementation = "lnd"
-
-# Get APP_<IMPLEMENTATION>_MIDDLEWARE_IP from the .env file
-dotenv=parse_dotenv('./.env')
-MIDDLEWARE_IP = dotenv["APP_{}_MIDDLEWARE_IP".format(implementation.upper().replace("-", "_"))]
-
-build_template("./templates/.env-sample", "./.env")
-
-print("Updating app configuration...\n")
-os.system('./scripts/app generate')
-
 # Touch status_dir/configured
 with open(status_dir+'/configured', 'w') as file:
   file.write('')
 
 print("Configuring permissions...\n")
 try:
-  os.system('chown -R 1000:1000 {}'.format(CITADEL_ROOT))
+  os.system('chown -R 1000:1000 {}'.format(NIRVATI_ROOT))
 except: pass
 
 print("Configuration successful\n")

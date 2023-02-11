@@ -1,12 +1,8 @@
 /.*
-bitcoin/*
 /db/*
-lnd/*
 statuses
-tor/*
 logs/*
 app-data/*
 caddy/*
 services/installed.yml
 apps/*
-i2p/*
